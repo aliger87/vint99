@@ -6,12 +6,15 @@ using System.Collections.Generic;
 public class PlayerMovementController : MonoBehaviour
 {
     private Animator animator;
-    private Rigidbody rb;
+    private CharacterController cc;
     private Camera playerCamera;
+    private Transform cameraRoot;
 
     public float walkSpeed = 1.0f;
     public float runSpeed = 3.0f;
     public float mouseSensitivity = 100f;
+    public float animatorLerpPower = 8;
+    public float gravityScale = 10;
     private float xRotation = 0f;
 
     public GameObject backpackOnGround;
@@ -47,8 +50,9 @@ public class PlayerMovementController : MonoBehaviour
     void Start()
     {
         animator = GetComponent<Animator>();
-        rb = GetComponent<Rigidbody>();
+        cc = GetComponent<CharacterController>();
         playerCamera = GetComponentInChildren<Camera>();
+        cameraRoot = playerCamera.transform.parent;
 
         currentHealth = maxHealth;
         healthSlider.value = CalculateHealth();
@@ -82,13 +86,14 @@ public class PlayerMovementController : MonoBehaviour
         movement = transform.TransformDirection(movement);
         float speed = movement.magnitude;
 
-        animator.SetFloat("Motion", speed);
-
         bool isRunning = Input.GetKey(KeyCode.LeftShift);
-        animator.SetBool("Run", isRunning);
+        animator.SetFloat("InputX", Mathf.Lerp(animator.GetFloat("InputX"), moveHorizontal, Time.deltaTime * animatorLerpPower));
+        animator.SetFloat("InputY", Mathf.Lerp(animator.GetFloat("InputY"), moveVertical * (isRunning ? 1 : .5f), Time.deltaTime * animatorLerpPower));
+
+        healthSlider.value = Mathf.Lerp(healthSlider.value, CalculateHealth(), Time.deltaTime * animatorLerpPower);
 
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
-        rb.MovePosition(transform.position + movement.normalized * currentSpeed * Time.deltaTime);
+        cc.Move(((movement.normalized * currentSpeed) + (Vector3.down * gravityScale)) * Time.deltaTime);
 
         LookAround();
 
@@ -119,7 +124,7 @@ public class PlayerMovementController : MonoBehaviour
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -30f, 30f);
 
-        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        cameraRoot.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         transform.Rotate(Vector3.up * mouseX);
     }
 
@@ -235,7 +240,6 @@ public class PlayerMovementController : MonoBehaviour
     public void TakeDamage(float amount)
     {
         currentHealth -= amount;
-        healthSlider.value = CalculateHealth();
 
         if (currentHealth <= 0)
         {
@@ -254,9 +258,9 @@ public class PlayerMovementController : MonoBehaviour
         gameObject.SetActive(false);
 
         // فصل الكاميرا عن اللاعب للحفاظ عليها نشطة
-        playerCamera.transform.SetParent(null);
+        cameraRoot.SetParent(null);
 
         // إنشاء الصندوق في مكان موت اللاعب
-        Instantiate(deathBoxPrefab, transform.position, Quaternion.identity);
+        Instantiate(deathBoxPrefab, deathBoxPrefab.transform.position + transform.position, Quaternion.Euler(deathBoxPrefab.transform.eulerAngles + transform.eulerAngles));
     }
 }
