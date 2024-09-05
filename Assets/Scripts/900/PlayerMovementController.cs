@@ -9,7 +9,11 @@ public class PlayerMovementController : MonoBehaviour
     private CharacterController cc;
     private Camera playerCamera;
     private Transform cameraRoot;
+    private CharacterItem groundItem;
+    private GameObject groundViewItem;
+    public ItemBag bag { get; private set; }
 
+    [Header("Basic")]
     public float walkSpeed = 1.0f;
     public float runSpeed = 3.0f;
     public float mouseSensitivity = 100f;
@@ -17,35 +21,25 @@ public class PlayerMovementController : MonoBehaviour
     public float gravityScale = 10;
     private float xRotation = 0f;
 
-    public GameObject backpackOnGround;
-    public GameObject backpackOnPlayer;
-    public GameObject helmetOnGround;
-    public GameObject helmetOnPlayer;
-    public GameObject armorOnGround;
-    public GameObject armorOnPlayer;
-
+    [Header("Interaction")]
     public GameObject interactionPanel;
     public Image interactionImage;
     public TextMeshProUGUI interactionText;
 
-    public Sprite backpackImage;
-    public Sprite helmetImage;
-    public Sprite armorImage;
-
     public float pickupRange = 2.0f;
-
-    private List<GameObject> objectsOnGround = new List<GameObject>();
-    private List<GameObject> objectsOnPlayer = new List<GameObject>();
-    private List<Sprite> objectImages = new List<Sprite>();
-    private List<string> objectTexts = new List<string>();
 
     private CanvasGroup canvasGroup;
 
+    [Header("Health")]
     public float maxHealth = 100f;
     public float currentHealth;
     public Slider healthSlider;
 
     public GameObject deathBoxPrefab;
+
+    [Header("Points")]
+    public Transform Head;
+    public Transform Root;
 
     void Start()
     {
@@ -53,6 +47,7 @@ public class PlayerMovementController : MonoBehaviour
         cc = GetComponent<CharacterController>();
         playerCamera = GetComponentInChildren<Camera>();
         cameraRoot = playerCamera.transform.parent;
+        bag = GetComponent<ItemBag>();
 
         currentHealth = maxHealth;
         healthSlider.value = CalculateHealth();
@@ -65,9 +60,6 @@ public class PlayerMovementController : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
 
-        if (backpackOnPlayer != null) backpackOnPlayer.SetActive(false);
-        if (helmetOnPlayer != null) helmetOnPlayer.SetActive(false);
-        if (armorOnPlayer != null) armorOnPlayer.SetActive(false);
         if (interactionPanel != null)
         {
             interactionPanel.SetActive(false);
@@ -97,7 +89,14 @@ public class PlayerMovementController : MonoBehaviour
 
         LookAround();
 
-        if (Input.GetKeyDown(KeyCode.F) && objectsOnGround.Count > 0) PickupItems();
+        if (Input.GetKeyDown(KeyCode.F) && groundItem != null)
+            if (bag.AddItem(groundItem))
+            {
+                Destroy(groundViewItem);
+                groundItem.Take(this);
+                groundViewItem = null;
+                groundItem = null;
+            }
     }
 
     void RotateTowardsMouse()
@@ -128,88 +127,38 @@ public class PlayerMovementController : MonoBehaviour
         transform.Rotate(Vector3.up * mouseX);
     }
 
-    void PickupItems()
-    {
-        for (int i = 0; i < objectsOnGround.Count; i++)
-        {
-            objectsOnGround[i].SetActive(false);
-            objectsOnPlayer[i].SetActive(true);
-        }
-
-        objectsOnGround.Clear();
-        objectsOnPlayer.Clear();
-        objectImages.Clear();
-        objectTexts.Clear();
-
-        HideInteractionPanel();
-    }
-
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Enemy"))
         {
             TakeDamage(20f);
         }
-
-        if (other.gameObject == backpackOnGround)
+        if (other.CompareTag("Item"))
         {
-            AddItemToPanel(backpackOnGround, backpackOnPlayer, backpackImage, "ﺔﺒﻴﻘﺤﻟﺍ ﺬﺧﻷ F ﻂﻐﺿﺍ");
-        }
-        else if (other.gameObject == helmetOnGround)
-        {
-            AddItemToPanel(helmetOnGround, helmetOnPlayer, helmetImage, "ﺓﺫﻮﺨﻟﺍ ﺬﺧﻷ F ﻂﻐﺿﺍ");
-        }
-        else if (other.gameObject == armorOnGround)
-        {
-            AddItemToPanel(armorOnGround, armorOnPlayer, armorImage, "ﻉﺭﺪﻟﺍ ﺬﺧﻷ F ﻂﻐﺿﺍ");
+            groundItem = other.GetComponent<ViewItem>().Item.GetComponent<CharacterItem>();
+            groundViewItem = other.gameObject;
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (objectsOnGround.Contains(other.gameObject))
-        {
-            RemoveItemFromPanel(other.gameObject);
-        }
+        groundItem = null;
     }
 
-    void AddItemToPanel(GameObject groundItem, GameObject playerItem, Sprite itemImage, string itemText)
+    private void FixedUpdate()
     {
-        objectsOnGround.Add(groundItem);
-        objectsOnPlayer.Add(playerItem);
-        objectImages.Add(itemImage);
-        objectTexts.Add(itemText);
-        UpdateInteractionPanel();
-    }
-
-    void RemoveItemFromPanel(GameObject groundItem)
-    {
-        int index = objectsOnGround.IndexOf(groundItem);
-        if (index >= 0)
-        {
-            objectsOnGround.RemoveAt(index);
-            objectsOnPlayer.RemoveAt(index);
-            objectImages.RemoveAt(index);
-            objectTexts.RemoveAt(index);
-        }
-        if (objectsOnGround.Count == 0)
-        {
-            HideInteractionPanel();
-        }
-        else
-        {
-            UpdateInteractionPanel();
-        }
+        if (groundItem != null) UpdateInteractionPanel();
+        else HideInteractionPanel();
     }
 
     void UpdateInteractionPanel()
     {
-        if (objectImages.Count > 0)
+        if (groundItem != null)
         {
-            interactionImage.sprite = objectImages[objectImages.Count - 1];
-            interactionText.text = objectTexts[objectTexts.Count - 1];
+            interactionImage.sprite = groundItem.Image;
+            interactionText.text = groundItem.name;
+            ShowInteractionPanel();
         }
-        ShowInteractionPanel();
     }
 
     void ShowInteractionPanel()
