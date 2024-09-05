@@ -6,6 +6,7 @@ TagManager:
   tags:
   - CinemachineTarget
   - Enemy
+  - Item
   layers:
   - Default
   - TransparentFX
@@ -16,7 +17,7 @@ TagManager:
   - BulletIgnore
   - Bullet
   - User
-  - 
+  - Item
   - 
   - 
   - 
